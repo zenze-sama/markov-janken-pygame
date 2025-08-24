@@ -1,8 +1,6 @@
+import asyncio
 import pygame
 import random
-import sys
-import os
-from collections import defaultdict
 
 pygame.init()
 
@@ -18,13 +16,13 @@ TEXT_COLOR = (50, 50, 50)
 WHITE = (255, 255, 255)
 HIGHLIGHT = (230, 230, 250)
 
-font = "PixelifySans-VariableFont_wght.ttf"
+font = "poiaeronauttrial-regular.ttf"
 title_font = pygame.font.Font(font, 48)
 choice_font = pygame.font.Font(font, 32)
 result_font = pygame.font.Font(font, 36)
 score_font = pygame.font.Font(font, 28)
 button_font = pygame.font.Font(font, 24)
-small_font = pygame.font.Font(font, 18)
+small_font = pygame.font.Font(font, 20)
 
 player_score = 0
 computer_score = 0
@@ -37,8 +35,7 @@ paper_rect = pygame.Rect(340, 400, 120, 120)
 scisors_rect = pygame.Rect(530, 400, 120, 120)
 
 player_history = []
-pattern_counts = defaultdict(lambda: defaultdict(int))
-patterns_file = "markov_patterns.txt"
+pattern_counts = {}
 
 def load_image(name, size=(100, 100)):
     try:
@@ -109,7 +106,7 @@ def get_markov_move():
     prev1 = player_history[-1]
     pattern_key = (prev2, prev1)
     
-    if not pattern_counts[pattern_key]:
+    if pattern_key not in pattern_counts or not pattern_counts[pattern_key]:
         return get_frequency_based_move()
     
     predicted_move = max(pattern_counts[pattern_key], key=pattern_counts[pattern_key].get)
@@ -128,52 +125,10 @@ def determine_winner(player, computer):
     else:
         return "Computer wins!"
 
-def save_patterns():
-    try:
-        with open(patterns_file, 'w') as f:
-            for pattern_key, counts in pattern_counts.items():
-                if counts:
-                    f.write(f"[{pattern_key[0]} {pattern_key[1]}] -> ")
-                    for move, count in counts.items():
-                        f.write(f"{move} ({count}) ")
-                    f.write("\n")
-    except Exception as e:
-        print(f"Error saving patterns: {e}")
-
-def load_patterns():
-    global pattern_counts
-    try:
-        if os.path.exists(patterns_file):
-            with open(patterns_file, 'r') as f:
-                for line in f:
-                    if '->' in line:
-                        pattern_part, counts_part = line.split('->', 1)
-                        pattern_part = pattern_part.strip().strip('[]')
-                        moves = pattern_part.split()
-                        if len(moves) == 2:
-                            pattern_key = (moves[0], moves[1])
-                            count_items = counts_part.strip().split()
-                            for i in range(0, len(count_items), 2):
-                                if i + 1 < len(count_items):
-                                    move = count_items[i]
-                                    count_str = count_items[i+1].strip('()')
-                                    try:
-                                        count = int(count_str)
-                                        pattern_counts[pattern_key][move] = count
-                                    except ValueError:
-                                        continue
-    except Exception as e:
-        print(f"Error loading patterns: {e}")
-
 def reset_patterns():
     global pattern_counts, player_history
-    pattern_counts = defaultdict(lambda: defaultdict(int))
+    pattern_counts = {}
     player_history = []
-    try:
-        if os.path.exists(patterns_file):
-            os.remove(patterns_file)
-    except Exception as e:
-        print(f"Error resetting patterns: {e}")
 
 def draw_game():
     screen.fill(BACKGROUND)
@@ -224,6 +179,13 @@ def make_choice(choice):
         prev2 = player_history[-2]
         prev1 = player_history[-1]
         pattern_key = (prev2, prev1)
+        
+        if pattern_key not in pattern_counts:
+            pattern_counts[pattern_key] = {}
+        
+        if player_choice not in pattern_counts[pattern_key]:
+            pattern_counts[pattern_key][player_choice] = 0
+            
         pattern_counts[pattern_key][player_choice] += 1
     
     player_history.append(player_choice)
@@ -233,44 +195,47 @@ def make_choice(choice):
     elif result == "Computer wins!":
         computer_score += 1
 
-load_patterns()
-
 clock = pygame.time.Clock()
 running = True
 
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            save_patterns()
-            running = False
+async def main():
+    global running
+    
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                
+                if rock_rect.collidepoint(mouse_pos):
+                    make_choice("rock")
+                        
+                elif paper_rect.collidepoint(mouse_pos):
+                    make_choice("paper")
+                        
+                elif scisors_rect.collidepoint(mouse_pos):
+                    make_choice("scisors")
             
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_pos = pygame.mouse.get_pos()
-            
-            if rock_rect.collidepoint(mouse_pos):
-                make_choice("rock")
-                    
-            elif paper_rect.collidepoint(mouse_pos):
-                make_choice("paper")
-                    
-            elif scisors_rect.collidepoint(mouse_pos):
-                make_choice("scisors")
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    make_choice("rock")
+                elif event.key == pygame.K_2:
+                    make_choice("paper")
+                elif event.key == pygame.K_3:
+                    make_choice("scisors")
+                elif event.key == pygame.K_r:
+                    reset_patterns()
         
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_1:
-                make_choice("rock")
-            elif event.key == pygame.K_2:
-                make_choice("paper")
-            elif event.key == pygame.K_3:
-                make_choice("scisors")
-            elif event.key == pygame.K_r:
-                reset_patterns()
-    
-    draw_game()
-    
-    pygame.display.flip()
-    clock.tick(60)
+        draw_game()
+        
+        pygame.display.flip()
+        clock.tick(60)
+        await asyncio.sleep(0)
 
-save_patterns()
-pygame.quit()
-sys.exit()
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    finally:
+        pygame.quit()
