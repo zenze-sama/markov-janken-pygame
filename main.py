@@ -165,6 +165,16 @@ def load_patterns():
     except Exception as e:
         print(f"Error loading patterns: {e}")
 
+def reset_patterns():
+    global pattern_counts, player_history
+    pattern_counts = defaultdict(lambda: defaultdict(int))
+    player_history = []
+    try:
+        if os.path.exists(patterns_file):
+            os.remove(patterns_file)
+    except Exception as e:
+        print(f"Error resetting patterns: {e}")
+
 def draw_game():
     screen.fill(BACKGROUND)
     
@@ -176,14 +186,14 @@ def draw_game():
     screen.blit(score_surf, (WIDTH//2 - score_surf.get_width()//2, 100))
     
     pattern_count = sum(len(counts) for counts in pattern_counts.values())
-    pattern_text = f"Patterns learned: {pattern_count}"
+    pattern_text = f"Patterns learned: {pattern_count} (R to Reset Patterns)"
     pattern_surf = small_font.render(pattern_text, True, TEXT_COLOR)
-    screen.blit(pattern_surf, (WIDTH//2 - pattern_surf.get_width()//2, 140))
+    screen.blit(pattern_surf, (WIDTH//2 - pattern_surf.get_width()//2, 160))
     
     mouse_pos = pygame.mouse.get_pos()
-    draw_choice(rock_rect, rock_img, "Rock", rock_rect.collidepoint(mouse_pos))
-    draw_choice(paper_rect, paper_img, "Paper", paper_rect.collidepoint(mouse_pos))
-    draw_choice(scisors_rect, scisors_img, "Scisors", scisors_rect.collidepoint(mouse_pos))
+    draw_choice(rock_rect, rock_img, "Rock (1)", rock_rect.collidepoint(mouse_pos))
+    draw_choice(paper_rect, paper_img, "Paper (2)", paper_rect.collidepoint(mouse_pos))
+    draw_choice(scisors_rect, scisors_img, "Scisors (3)", scisors_rect.collidepoint(mouse_pos))
     
     if player_choice is not None:
         if player_choice == "rock":
@@ -203,6 +213,26 @@ def draw_game():
         result_surf = result_font.render(result, True, TEXT_COLOR)
         screen.blit(result_surf, (WIDTH//2 - result_surf.get_width()//2, 320))
 
+def make_choice(choice):
+    global player_choice, computer_choice, result, player_score, computer_score
+    
+    player_choice = choice
+    computer_choice = computer_pick()
+    result = determine_winner(player_choice, computer_choice)
+    
+    if len(player_history) >= 2:
+        prev2 = player_history[-2]
+        prev1 = player_history[-1]
+        pattern_key = (prev2, prev1)
+        pattern_counts[pattern_key][player_choice] += 1
+    
+    player_history.append(player_choice)
+    
+    if result == "You win!":
+        player_score += 1
+    elif result == "Computer wins!":
+        computer_score += 1
+
 load_patterns()
 
 clock = pygame.time.Clock()
@@ -218,58 +248,23 @@ while running:
             mouse_pos = pygame.mouse.get_pos()
             
             if rock_rect.collidepoint(mouse_pos):
-                player_choice = "rock"
-                computer_choice = computer_pick()
-                result = determine_winner(player_choice, computer_choice)
-                
-                if len(player_history) >= 2:
-                    prev2 = player_history[-2]
-                    prev1 = player_history[-1]
-                    pattern_key = (prev2, prev1)
-                    pattern_counts[pattern_key][player_choice] += 1
-                
-                player_history.append(player_choice)
-                
-                if result == "You win!":
-                    player_score += 1
-                elif result == "Computer wins!":
-                    computer_score += 1
+                make_choice("rock")
                     
             elif paper_rect.collidepoint(mouse_pos):
-                player_choice = "paper"
-                computer_choice = computer_pick()
-                result = determine_winner(player_choice, computer_choice)
-                
-                if len(player_history) >= 2:
-                    prev2 = player_history[-2]
-                    prev1 = player_history[-1]
-                    pattern_key = (prev2, prev1)
-                    pattern_counts[pattern_key][player_choice] += 1
-                
-                player_history.append(player_choice)
-                
-                if result == "You win!":
-                    player_score += 1
-                elif result == "Computer wins!":
-                    computer_score += 1
+                make_choice("paper")
                     
             elif scisors_rect.collidepoint(mouse_pos):
-                player_choice = "scisors"
-                computer_choice = computer_pick()
-                result = determine_winner(player_choice, computer_choice)
-                
-                if len(player_history) >= 2:
-                    prev2 = player_history[-2]
-                    prev1 = player_history[-1]
-                    pattern_key = (prev2, prev1)
-                    pattern_counts[pattern_key][player_choice] += 1
-                
-                player_history.append(player_choice)
-                
-                if result == "You win!":
-                    player_score += 1
-                elif result == "Computer wins!":
-                    computer_score += 1
+                make_choice("scisors")
+        
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_1:
+                make_choice("rock")
+            elif event.key == pygame.K_2:
+                make_choice("paper")
+            elif event.key == pygame.K_3:
+                make_choice("scisors")
+            elif event.key == pygame.K_r:
+                reset_patterns()
     
     draw_game()
     
